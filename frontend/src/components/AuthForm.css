@@ -1,0 +1,21 @@
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.feedback-msg {
+  text-align: center;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 0px;
+  margin-top: 10px;
+}
+.feedback-msg.erro {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+.feedback-msg.sucesso {
+  background-color: #d4edda;
+  color: #155724;
+}
