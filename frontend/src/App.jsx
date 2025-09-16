@@ -1,32 +1,34 @@
 import { useAuth } from './hooks/useAuth';
 import { AuthPage } from './pages/AuthPage';
+import { HomePage } from './pages/HomePage';
+import { MainLayout } from './components/MainLayout';
 
 function App() {
-  // Usamos nosso hook customizado para pegar o status do usuário.
   const { usuario, carregando } = useAuth();
 
-  // Se ainda estivermos verificando a sessão, mostramos uma mensagem de carregamento.
+  // A função de logout agora é necessária aqui para ser passada ao layout
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    location.reload();
+  };
+
   if (carregando) {
     return <h1>Carregando...</h1>;
   }
 
-  // Após a verificação, decidimos qual "mundo" mostrar.
   return (
-    <div>
+    <>
       {usuario ? (
-        // Se o 'usuario' EXISTE (não é null), o usuário está logado.
-        // Mostramos a aplicação principal.
-        <div>
-          <h1>Aplicação Principal</h1>
-          <p>Bem-vindo, {usuario.email}!</p>
-          {/* Aqui entrarão os componentes da nossa lista de compras */}
-        </div>
+        // Se o usuário está logado, renderiza o Layout Principal
+        // e coloca a HomePage DENTRO dele (como 'children')
+        <MainLayout usuario={usuario} onLogout={handleLogout}>
+          <HomePage />
+        </MainLayout>
       ) : (
-        // Se o 'usuario' NÃO EXISTE (é null), o usuário está deslogado.
-        // Mostramos a página de autenticação.
+        // Se não, mostra a página de autenticação
         <AuthPage />
       )}
-    </div>
+    </>
   );
 }
 

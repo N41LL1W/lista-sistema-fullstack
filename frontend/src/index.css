@@ -44,3 +44,38 @@ p {
   text-align: center;
   margin-top: 20px;
 }
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-radius: 8px;
+  max-width: 600px; /* Mesma largura do container principal */
+  margin: 0 auto 20px auto;
+}
+
+.btn-secundario {
+  background-color: #6c757d;
+}
+.btn-secundario:hover {
+  background-color: #5a6268;
+}
+
+/* Estilos para a lista de listas */
+.listas-salvas {
+  margin-top: 20px;
+}
+.listas-salvas ul {
+  list-style: none;
+  padding: 0;
+}
+.listas-salvas li {
+  padding: 15px;
+  background-color: #f8f9fa;
+  border: 1px solid #e2e6ea;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
