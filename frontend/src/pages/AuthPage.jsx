@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { AuthForm } from '../components/AuthForm';
+import { apiFetch } from '../utils/api'; // Importa nossa nova função
 
 export function AuthPage() {
   const [isLoginView, setIsLoginView] = useState(true);
   const [feedback, setFeedback] = useState(null);
-  const [isLoading, setIsLoading] = useState(false); // Estado para controlar o carregamento
+  const [isLoading, setIsLoading] = useState(false);
 
   const mostrarFeedback = (mensagem, tipo = 'erro') => {
     setFeedback({ mensagem, tipo });
@@ -15,15 +16,11 @@ export function AuthPage() {
     setIsLoading(true);
     setFeedback(null);
     try {
-      const response = await fetch('/api/auth/registrar', {
+      // Usa a nova função apiFetch
+      await apiFetch('/api/auth/registrar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, senha }),
+        body: { email, senha },
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message);
-      }
       mostrarFeedback('Registro bem-sucedido! Por favor, faça o login.', 'sucesso');
       setIsLoginView(true);
     } catch (error) {
@@ -37,16 +34,12 @@ export function AuthPage() {
     setIsLoading(true);
     setFeedback(null);
     try {
-      const response = await fetch('/api/auth/login', {
+      // Usa a nova função apiFetch
+      await apiFetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, senha }),
+        body: { email, senha },
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message);
-      }
-      location.reload();
+      location.reload(); // Recarrega a página para o useAuth detectar a sessão
     } catch (error) {
       mostrarFeedback(error.message, 'erro');
     } finally {

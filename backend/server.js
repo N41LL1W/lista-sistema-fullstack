@@ -12,6 +12,29 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
+// --- BLOCO DE TESTE DE CONEXÃO ---
+pool.connect((err, client, release) => {
+    if (err) {
+        console.error('----------------------------------------------------');
+        console.error('ERRO CRÍTICO AO CONECTAR COM O BANCO DE DADOS:');
+        console.error('Isso geralmente acontece por uma das seguintes razões:');
+        console.error('1. A variável DATABASE_URL no arquivo .env está incorreta.');
+        console.error('2. O banco de dados do Neon DB está "adormecido" (idle). Tente acessá-lo pelo site para "acordá-lo".');
+        console.error('3. Um firewall na sua rede (ex: rede corporativa) está bloqueando a porta 5432.');
+        console.error('----------------------------------------------------');
+        return console.error('Detalhes do Erro:', err.stack);
+    }
+    client.query('SELECT NOW()', (err, result) => {
+        release(); // Libera o cliente de volta para o pool
+        if (err) {
+            return console.error('Erro ao executar query de teste:', err.stack);
+        }
+        console.log('✅ Conexão com o Banco de Dados bem-sucedida:', result.rows[0]);
+    });
+});
+// --- FIM DO BLOCO DE TESTE ---
+
+
 // --- MIDDLEWARE & SESSÃO ---
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -81,48 +104,11 @@ app.get('/api/auth/status', (req, res) => {
     }
 });
 
-// --- ROTAS DE CATEGORIAS ---
-app.get('/api/categorias/buscar', isAuth, async (req, res) => {
-    const termoBusca = req.query.termo || '';
-    try {
-        const query = "SELECT id, nome FROM categorias_padronizadas WHERE nome ILIKE $1 ORDER BY nome LIMIT 10";
-        const result = await pool.query(query, [`%${termoBusca}%`]);
-        res.status(200).json(result.rows);
-    } catch (err) {
-        console.error('Erro ao buscar categorias:', err.stack);
-        res.status(500).json({ message: 'Erro ao buscar categorias.' });
-    }
-});
-app.post('/api/categorias/find-or-create', isAuth, async (req, res) => {
-    const { nome_categoria } = req.body;
-    if (!nome_categoria) return res.status(400).json({ message: 'Nome da categoria é obrigatório.' });
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        let result = await client.query('SELECT * FROM categorias_padronizadas WHERE nome = $1', [nome_categoria]);
-        let categoria;
-        if (result.rowCount > 0) {
-            categoria = result.rows[0];
-        } else {
-            result = await client.query('INSERT INTO categorias_padronizadas (nome) VALUES ($1) RETURNING *', [nome_categoria]);
-            categoria = result.rows[0];
-        }
-        await client.query('COMMIT');
-        res.status(200).json(categoria);
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('Erro em find-or-create categoria:', err.stack);
-        res.status(500).json({ message: 'Erro ao processar categoria.' });
-    } finally {
-        client.release();
-    }
-});
-
 // --- ROTAS DE PRODUTOS ---
 app.get('/api/produtos/buscar', isAuth, async (req, res) => {
     const termoBusca = req.query.termo || '';
     try {
-        const query = "SELECT id, nome FROM produtos_padronizados WHERE nome ILIKE $1 ORDER BY nome LIMIT 10";
+        const query = "SELECT id, nome, categoria_sugerida FROM produtos_padronizados WHERE nome ILIKE $1 ORDER BY nome LIMIT 10";
         const result = await pool.query(query, [`%${termoBusca}%`]);
         res.status(200).json(result.rows);
     } catch (err) {
@@ -131,21 +117,27 @@ app.get('/api/produtos/buscar', isAuth, async (req, res) => {
     }
 });
 app.post('/api/produtos/find-or-create', isAuth, async (req, res) => {
-    const { nome_produto } = req.body;
+    const { nome_produto, categoria } = req.body;
     if (!nome_produto) return res.status(400).json({ message: 'Nome do produto é obrigatório.' });
+    const client = await pool.connect();
     try {
-        let result = await pool.query('SELECT * FROM produtos_padronizados WHERE nome = $1', [nome_produto]);
+        await client.query('BEGIN');
+        let result = await client.query('SELECT * FROM produtos_padronizados WHERE nome = $1', [nome_produto]);
         let produto;
         if (result.rowCount > 0) {
             produto = result.rows[0];
         } else {
-            result = await pool.query('INSERT INTO produtos_padronizados (nome) VALUES ($1) RETURNING *', [nome_produto]);
+            result = await client.query('INSERT INTO produtos_padronizados (nome, categoria_sugerida) VALUES ($1, $2) RETURNING *', [nome_produto, categoria]);
             produto = result.rows[0];
         }
+        await client.query('COMMIT');
         res.status(200).json(produto);
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error('Erro em find-or-create produto:', err.stack);
         res.status(500).json({ message: 'Erro ao processar produto.' });
+    } finally {
+        client.release();
     }
 });
 app.patch('/api/produtos/:produtoId', isAuth, async (req, res) => {
@@ -263,11 +255,8 @@ app.put('/api/listas/:listaId/reset', isAuth, async (req, res) => {
     const { listaId } = req.params;
     const { usuario_id } = req.session;
     try {
-        // A query já está correta, pois usa RETURNING *
-        const query = 'UPDATE itens_lista SET comprado = false, valor_unitario = NULL, quantidade = 1 WHERE lista_id = $1 AND lista_id IN (SELECT id FROM listas WHERE usuario_id = $2) RETURNING *';
+        const query = 'UPDATE itens_lista SET comprado = false, valor_unitario = NULL, quantidade = 1 WHERE lista_id = $1 AND lista_id IN (SELECT id FROM listas WHERE usuario_id = $2)';
         const result = await pool.query(query, [listaId, usuario_id]);
-        
-        // CORREÇÃO: Envia de volta o array de itens atualizados
         res.status(200).json(result.rows);
     } catch (err) {
         console.error('Erro ao resetar a lista:', err.stack);
@@ -287,7 +276,7 @@ app.post('/api/listas/:listaId/limpar-comprados', isAuth, async (req, res) => {
     }
 });
 
-// --- ROTAS DE ITENS (REFATORADAS) ---
+// --- ROTAS DE ITENS ---
 app.get('/api/listas/:listaId/itens', isAuth, async (req, res) => {
     const { listaId } = req.params;
     const { usuario_id } = req.session;
@@ -340,33 +329,6 @@ app.put('/api/itens/:itemId', isAuth, async (req, res) => {
         res.status(500).json({ message: 'Erro ao atualizar item.' });
     }
 });
-// ROTA PATCH QUE ESTAVA FALTANDO
-app.patch('/api/itens/:itemId', isAuth, async (req, res) => {
-    const { itemId } = req.params;
-    const { nome_item, categoria } = req.body;
-    const updates = [];
-    const values = [];
-    let queryIndex = 1;
-    if (nome_item) {
-        updates.push(`nome_item = $${queryIndex++}`);
-        values.push(nome_item);
-    }
-    if (categoria !== undefined) {
-        updates.push(`categoria = $${queryIndex++}`);
-        values.push(categoria === '' ? null : categoria);
-    }
-    if (updates.length === 0) return res.status(400).json({ message: 'Nenhum campo para atualizar.' });
-    values.push(itemId, req.session.usuario_id);
-    try {
-        const query = `UPDATE itens_lista SET ${updates.join(', ')} WHERE id = $${queryIndex} AND lista_id IN (SELECT id FROM listas WHERE usuario_id = $${queryIndex + 1}) RETURNING *`;
-        const result = await pool.query(query, values);
-        if (result.rowCount === 0) return res.status(404).json({ message: 'Item não encontrado ou acesso negado.' });
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        console.error('Erro ao atualizar item:', err.stack);
-        res.status(500).json({ message: 'Erro ao atualizar item.' });
-    }
-});
 app.delete('/api/itens/:itemId', isAuth, async (req, res) => {
     const { itemId } = req.params;
     const { usuario_id } = req.session;
@@ -381,7 +343,7 @@ app.delete('/api/itens/:itemId', isAuth, async (req, res) => {
     }
 });
 
-// --- ROTAS DE HISTÓRICO (REFATORADAS) ---
+// --- ROTAS DE HISTÓRICO ---
 app.post('/api/compras/finalizar', isAuth, async (req, res) => {
     const { itensComprados } = req.body;
     const { usuario_id } = req.session;
@@ -424,11 +386,12 @@ app.get('/api/share/:token', async (req, res) => {
         if (listaResult.rowCount === 0) return res.status(404).json({ message: 'Lista compartilhada não encontrada.' });
         const lista = listaResult.rows[0];
         const itensQuery = `
-            SELECT p.nome AS nome_item, p.categoria_sugerida AS categoria
+            SELECT p.nome AS nome_item, c.nome AS categoria
             FROM itens_lista i
             JOIN produtos_padronizados p ON i.produto_id = p.id
+            LEFT JOIN categorias_padronizadas c ON p.categoria_id = c.id
             WHERE i.lista_id = $1
-            ORDER BY p.categoria_sugerida ASC NULLS FIRST, p.nome ASC
+            ORDER BY c.nome ASC NULLS FIRST, p.nome ASC
         `;
         const itensResult = await pool.query(itensQuery, [lista.id]);
         res.status(200).json({
@@ -438,19 +401,6 @@ app.get('/api/share/:token', async (req, res) => {
     } catch (err) {
         console.error('Erro ao buscar lista compartilhada:', err.stack);
         res.status(500).json({ message: 'Erro ao buscar lista compartilhada.' });
-    }
-});
-
-// --- ROTA DE ITENS ÚNICOS (CORRIGIDA) ---
-app.get('/api/itens/unicos', async (req, res) => {
-    try {
-        const query = 'SELECT nome FROM produtos_padronizados ORDER BY nome ASC';
-        const result = await pool.query(query);
-        const nomesItens = result.rows.map(row => row.nome);
-        res.status(200).json(nomesItens);
-    } catch (err) {
-        console.error('Erro ao buscar itens únicos:', err.stack);
-        res.status(500).json({ message: 'Erro ao buscar itens únicos.' });
     }
 });
 
