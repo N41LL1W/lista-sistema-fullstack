@@ -48,32 +48,40 @@ pool.connect((err, client, release) => {
 
 
 // --- MIDDLEWARE & SESSÃO ---
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-// --- NOVA CONFIGURAÇÃO DE CORS AQUI ---
-const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-app.use(cors({
-    origin: frontendUrl, // Permite requisições APENAS desta origem
-    credentials: true    // Permite que cookies (como o da sessão) sejam enviados
-}));
+// 1. Confiar no proxy da Vercel (deve vir primeiro)
 app.set('trust proxy', 1);
+
+// 2. Configuração do CORS (deve vir antes das rotas e da sessão)
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+app.use(cors({
+    origin: frontendUrl, // Permite requisições APENAS do seu frontend
+    credentials: true    // ESSENCIAL para permitir o envio de cookies (sessão)
+}));
+
+// 3. Middlewares para processar o corpo da requisição e servir arquivos estáticos
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public'))); // Se você ainda tiver uma pasta public no backend
+
+// 4. Configuração da Sessão (com política de cookie corrigida)
 app.use(session({
     secret: process.env.SESSION_SECRET || 'um-segredo-muito-forte-para-desenvolvimento',
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        secure: process.env.NODE_ENV === 'production', 
-        maxAge: 1000 * 60 * 60 * 24 * 7,
+        secure: true, // Forçar 'secure' em produção, já que a Vercel sempre usa HTTPS
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 dias
         httpOnly: true,
-        sameSite: 'lax'
+        sameSite: 'none' // ESSENCIAL para permitir cookies entre domínios diferentes (frontend/backend)
     }
 }));
+
+// --- MIDDLEWARE DE AUTENTICAÇÃO ---
 const isAuth = (req, res, next) => {
     if (req.session.isAuth) {
         next();
     } else {
-        res.status(401).json({ message: 'Não autorizado.' });
+        res.status(401).json({ message: 'Não autorizado: você precisa estar logado.' });
     }
 };
 
