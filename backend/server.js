@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
+const cors = require('cors');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -49,6 +50,13 @@ pool.connect((err, client, release) => {
 // --- MIDDLEWARE & SESSÃO ---
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+// --- NOVA CONFIGURAÇÃO DE CORS AQUI ---
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+app.use(cors({
+    origin: frontendUrl, // Permite requisições APENAS desta origem
+    credentials: true    // Permite que cookies (como o da sessão) sejam enviados
+}));
 app.set('trust proxy', 1);
 app.use(session({
     secret: process.env.SESSION_SECRET || 'um-segredo-muito-forte-para-desenvolvimento',
