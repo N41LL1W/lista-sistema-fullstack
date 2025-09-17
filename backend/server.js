@@ -389,6 +389,35 @@ app.get('/api/itens/historico/:produtoId', isAuth, async (req, res) => {
     }
 });
 
+// --- NOVA ROTA PARA ESTATÍSTICAS DE PREÇO DA COMUNIDADE ---
+app.get('/api/produtos/:produtoId/estatisticas', isAuth, async (req, res) => {
+    const { produtoId } = req.params;
+    try {
+        // Usamos funções de agregação do SQL para calcular tudo em uma única query
+        const query = `
+            SELECT
+                AVG(valor_unitario) as preco_medio,
+                MIN(valor_unitario) as menor_preco,
+                MAX(valor_unitario) as maior_preco
+            FROM historico_precos
+            WHERE produto_id = $1
+        `;
+        const result = await pool.query(query, [produtoId]);
+
+        // A query sempre retorna uma linha, mesmo que não haja dados (os valores serão null)
+        const estatisticas = result.rows[0];
+
+        res.status(200).json({
+            preco_medio: parseFloat(estatisticas.preco_medio || 0).toFixed(2),
+            menor_preco: parseFloat(estatisticas.menor_preco || 0).toFixed(2),
+            maior_preco: parseFloat(estatisticas.maior_preco || 0).toFixed(2)
+        });
+    } catch (err) {
+        console.error('Erro ao buscar estatísticas do produto:', err.stack);
+        res.status(500).json({ message: 'Erro ao buscar estatísticas.' });
+    }
+});
+
 // --- ROTAS PÚBLICAS ---
 app.get('/api/share/:token', async (req, res) => {
     const { token } = req.params;

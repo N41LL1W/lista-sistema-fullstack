@@ -6,14 +6,19 @@ import { MainLayout } from './components/MainLayout';
 function App() {
   const { usuario, carregando } = useAuth();
 
-  // A função de logout agora é necessária aqui para ser passada ao layout
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    location.reload();
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+    } finally {
+      location.reload();
+    }
   };
 
   if (carregando) {
-    return <h1>Carregando...</h1>;
+    // Você pode criar um componente de Spinner/Loader mais bonito aqui
+    return <div className="loader-overlay" style={{display: 'flex'}}><div className="spinner"></div></div>;
   }
 
   return (

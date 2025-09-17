@@ -1,13 +1,51 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
-  </head>
-  <body>
-    <div id="root"></div>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Listas de Compras</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
+    <link rel="stylesheet" href="/style.css"> <!-- Usando caminho relativo para o CSS -->
+</head>
+<body>
+    <noscript>Você precisa habilitar o JavaScript para rodar este aplicativo.</noscript>
+    <div id="root"></div> <!-- O React irá renderizar a aplicação aqui -->
+
+    <!-- O Modal agora fica fora do #root, no body, para garantir que ele fique por cima de tudo -->
+    <div id="modal-historico" class="modal-overlay">
+        <div class="modal-content">
+            <span id="fechar-modal-historico" class="fechar-modal">&times;</span>
+            <h2 id="historico-titulo-item">Histórico de Preços</h2>
+
+            <!-- NOVA: Seção de Estatísticas da Comunidade -->
+            <div id="estatisticas-comunidade" class="estatisticas-container">
+                <h3>Preços da Comunidade</h3>
+                <div class="stats-grid">
+                    <div>
+                        <span>Menor Preço</span>
+                        <strong id="stat-menor-preco">R$ 0,00</strong>
+                    </div>
+                    <div>
+                        <span>Preço Médio</span>
+                        <strong id="stat-preco-medio">R$ 0,00</strong>
+                    </div>
+                    <div>
+                        <span>Maior Preço</span>
+                        <strong id="stat-maior-preco">R$ 0,00</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="historico-pessoal-container">
+                <h3>Seu Histórico Pessoal</h3>
+                <ul id="historico-lista-precos">
+                    <!-- Preços pessoais serão inseridos aqui pelo JavaScript -->
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
     <script type="module" src="/src/main.jsx"></script>
-  </body>
+</body>
 </html>
