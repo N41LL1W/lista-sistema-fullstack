@@ -7,9 +7,20 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// VERSÃO CORRIGIDA E MAIS ROBUSTA
+
+// Carrega as variáveis de ambiente do arquivo .env
+require('dotenv').config();
+
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    host: process.env.DB_HOST,
+    database: process.env.DB_DATABASE,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT || 5432,
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 // --- BLOCO DE TESTE DE CONEXÃO ---
